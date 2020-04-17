@@ -118,64 +118,65 @@ class LrScheduler:
         return LrScheduler.instance.schedule(e)
 
 
-class MyNN:
-    def __init__(self, x, y):
-        self.x = x
-        neurons = 1568
+class NeuralNetwork:
+    def __init__(self, input_I, input_L):
+        self.input_images = input_I
+        hidden_neurons_1 = 1568
+        hidden_neurons_2 = 1568
         self.lr = 0.5
-        ip_dim = x.shape[1]
-        op_dim = y.shape[1]
+        input_nodes = input_I.shape[1]
+        output_nodes = input_L.shape[1]
 
-        self.w1 = np.random.randn(ip_dim, neurons)
-        self.b1 = np.ones((1, neurons))
-        self.w2 = np.random.randn(neurons, neurons)
-        self.b2 = np.ones((1, neurons))
-        self.w3 = np.random.randn(neurons, op_dim)
-        self.b3 = np.ones((1, op_dim))
-        self.y = y
+        self.weights_layer1 = np.random.randn(input_nodes, hidden_neurons_1)
+        self.bias_layer1 = np.ones((1, hidden_neurons_1))
+        self.weights_layer2 = np.random.randn(hidden_neurons_1, hidden_neurons_2)
+        self.bias_layer2 = np.ones((1, hidden_neurons_2))
+        self.weights_layer3 = np.random.randn(hidden_neurons_2, output_nodes)
+        self.bias_layer3 = np.ones((1, output_nodes))
+        self.input_labels = input_L
 
-    def feedforward(self):
+    def feed_forward(self):
 
         # print("images: ", self.x.shape)
         # print("weights1: ",self.w1.shape)
 
-        z1 = np.dot(self.x, self.w1) + self.b1
-        self.a1 = sigmoid(z1)
+        x1 = np.dot(self.input_images, self.weights_layer1) + self.bias_layer1
+        self.o_layer1 = sigmoid(x1)
         # self.a1 = ReLU(z1)
-        z2 = np.dot(self.a1, self.w2) + self.b2
-        self.a2 = sigmoid(z2)
+        x2 = np.dot(self.o_layer1, self.weights_layer2) + self.bias_layer2
+        self.o_layer2 = sigmoid(x2)
         # self.a2 = ReLU(z2)
-        z3 = np.dot(self.a2, self.w3) + self.b3
-        self.a3 = softmax(z3)
+        x3 = np.dot(self.o_layer2, self.weights_layer3) + self.bias_layer3
+        self.o_layer3 = softmax(x3)
 
-    def backprop(self):
-        loss = error(self.a3, self.y)
+    def back_propogate(self):
+        loss = error(self.o_layer3, self.input_labels)
         print('Error :', loss)
         # print(self.a3)
         # print(self.y)
-        a3_delta = cross_entropy(self.a3, self.y)  # w3
-        z2_delta = np.dot(a3_delta, self.w3.T)
-        a2_delta = z2_delta * sigmoid_derv(self.a2)  # w2
+        o_layer3_delta = cross_entropy(self.o_layer3, self.input_labels)  # w3
+        x_layer2_delta = np.dot(o_layer3_delta, self.weights_layer3.T)
+        o_layer2_delta = x_layer2_delta * sigmoid_derv(self.o_layer2)  # w2
         # a2_delta = z2_delta * d_ReLU(self.a2)  # w2
-        z1_delta = np.dot(a2_delta, self.w2.T)
-        a1_delta = z1_delta * sigmoid_derv(self.a1)  # w1
+        x_layer1_delta = np.dot(o_layer2_delta, self.weights_layer2.T)
+        o_layer1_delta = x_layer1_delta * sigmoid_derv(self.o_layer1)  # w1
         # a1_delta = z1_delta * d_ReLU(self.a1)  # w1
 
-        self.w3 -= self.lr * np.dot(self.a2.T, a3_delta)
-        self.b3 -= self.lr * np.sum(a3_delta, axis=0, keepdims=True)
-        self.w2 -= self.lr * np.dot(self.a1.T, a2_delta)
-        self.b2 -= self.lr * np.sum(a2_delta, axis=0)
-        self.w1 -= self.lr * np.dot(self.x.T, a1_delta)
-        self.b1 -= self.lr * np.sum(a1_delta, axis=0)
+        self.weights_layer3 -= self.lr * np.dot(self.o_layer2.T, o_layer3_delta)
+        self.bias_layer3 -= self.lr * np.sum(o_layer3_delta, axis=0, keepdims=True)
+        self.weights_layer2 -= self.lr * np.dot(self.o_layer1.T, o_layer2_delta)
+        self.bias_layer2 -= self.lr * np.sum(o_layer2_delta, axis=0)
+        self.weights_layer1 -= self.lr * np.dot(self.input_images.T, o_layer1_delta)
+        self.bias_layer1 -= self.lr * np.sum(o_layer1_delta, axis=0)
 
     def predict(self, data):
-        self.x = data
-        self.feedforward()
-        return self.a3.argmax()
+        self.input_images = data
+        self.feed_forward()
+        return self.o_layer3.argmax()
 
     def update_batch(self, batch, labels):
-        self.x = batch
-        self.y = labels
+        self.input_images = batch
+        self.input_labels = labels
 
     def adjust_lr(self, lr):
         self.lr = lr
@@ -264,7 +265,7 @@ def train(images, labels, test_images, test_labels):
     epoch_list = []
     learning_rates = []
 
-    model = MyNN(images[0:100] / 255.0, np.array(labels[0:100]))
+    model = NeuralNetwork(images[0:100] / 255.0, np.array(labels[0:100]))
 
     lr_sched = LrScheduler(.5, .1)
 
@@ -281,14 +282,14 @@ def train(images, labels, test_images, test_labels):
             start_index = i * batch_size
             end_index = start_index + batch_size
             model.update_batch(images[start_index:end_index] / 255.0, labels[start_index:end_index])
-            model.feedforward()
-            model.backprop()
+            model.feed_forward()
+            model.back_propogate()
 
-        accuracies.append(get_acc(test_images / 255, np.array(test_labels), model))
-        epoch_list.append(x)
-        learning_rates.append(model.lr)
+        # accuracies.append(get_acc(test_images / 255, np.array(test_labels), model))
+        # epoch_list.append(x)
+        # learning_rates.append(model.lr)
 
-    output_plots(accuracies, learning_rates, epoch_list)
+    # output_plots(accuracies, learning_rates, epoch_list)
     # model.update_batch(images1 / 255.0, labels1)
     # model.feedforward()
     # model.backprop()
