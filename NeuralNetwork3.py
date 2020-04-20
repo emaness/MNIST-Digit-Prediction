@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+from math import ceil
+import argparse
 
 start_time = time.time()
 
@@ -17,26 +19,26 @@ def build_target(target: float) -> list:
     return array
 
 
-def load_train_images() -> list:
-    images = np.genfromtxt("./train_image.csv", delimiter=",")
+def load_train_images(path) -> list:
+    images = np.genfromtxt(path, delimiter=",")
     return images
 
 
-def load_train_labels() -> list:
-    load = np.genfromtxt("./train_label.csv", delimiter=",")
+def load_train_labels(path) -> list:
+    load = np.genfromtxt(path, delimiter=",")
     # vector = np.vectorize(build_target, otypes=[int])
     # labels = vector(load)
     labels = [build_target(i) for i in load]
     # print(labels)
     return labels
 
-def load_test_images() -> list:
-    images = np.genfromtxt("./test_image.csv", delimiter=",")
+def load_test_images(path) -> list:
+    images = np.genfromtxt(path, delimiter=",")
     return images
 
 
-def load_test_labels() -> list:
-    load = np.genfromtxt("./test_label.csv", delimiter=",")
+def load_test_labels(path = "./test_label.csv") -> list:
+    load = np.genfromtxt(path, delimiter=",")
     # vector = np.vectorize(build_target, otypes=[int])
     # labels = vector(load)
     labels = [build_target(i) for i in load]
@@ -121,11 +123,11 @@ class LrScheduler:
 class NeuralNetwork:
     def __init__(self, input_I, input_L):
         self.input_images = input_I
-        hidden_neurons_1 = 1568
-        hidden_neurons_2 = 1568
         self.lr = 0.5
         input_nodes = input_I.shape[1]
         output_nodes = input_L.shape[1]
+        hidden_neurons_1 = input_nodes*2
+        hidden_neurons_2 = input_nodes*2
 
         self.weights_layer1 = np.random.randn(input_nodes, hidden_neurons_1)
         self.bias_layer1 = np.ones((1, hidden_neurons_1))
@@ -150,8 +152,8 @@ class NeuralNetwork:
         self.o_layer3 = softmax(x3)
 
     def back_propogate(self):
-        loss = error(self.o_layer3, self.input_labels)
-        print('Error :', loss)
+        # loss = error(self.o_layer3, self.input_labels)
+        # print('Error :', loss)
         # print(self.a3)
         # print(self.y)
         o_layer3_delta = cross_entropy(self.o_layer3, self.input_labels)  # w3
@@ -172,7 +174,7 @@ class NeuralNetwork:
     def predict(self, data):
         self.input_images = data
         self.feed_forward()
-        return self.o_layer3.argmax()
+        return self.o_layer3.argmax(axis=1)
 
     def update_batch(self, batch, labels):
         self.input_images = batch
@@ -181,17 +183,18 @@ class NeuralNetwork:
     def adjust_lr(self, lr):
         self.lr = lr
 
-def output_plots(accuracies, learning_rates, epochs):
+def output_plots(accuracies, epochs):
+    #learning_rates,
     # print(accuracies)
     plt.figure(1)
     plt.plot(epochs, accuracies)
     plt.ylabel("Accuracy")
     plt.xlabel("Epoch")
 
-    plt.figure(2)
-    plt.plot(epochs, learning_rates)
-    plt.ylabel("LR")
-    plt.xlabel("Epoch")
+    # plt.figure(2)
+    # plt.plot(epochs, learning_rates)
+    # plt.ylabel("LR")
+    # plt.xlabel("Epoch")
     plt.show()
 
 
@@ -257,39 +260,53 @@ def train(images, labels, test_images, test_labels):
     #     image_sets[i] = images[start_index:end_index]
     #     label_sets[i] = labels[start_index:end_index]
 
-    batches = int(images.shape[0] / 100)
+    # get rid of magic numbers
     batch_size = 100
     epochs = 10
+    num_examples = images.shape[0]
+
+    batches = int(ceil(num_examples / batch_size))
+    # print("batches: %d", batches)
 
     accuracies = []
     epoch_list = []
     learning_rates = []
 
-    model = NeuralNetwork(images[0:100] / 255.0, np.array(labels[0:100]))
+    model = NeuralNetwork(images[0:batch_size] / 255.0, np.array(labels[0:batch_size]))
 
     lr_sched = LrScheduler(.5, .1)
 
-
     for x in range(epochs):
-
 
         lr = lr_sched.schedule(x)
         model.adjust_lr(lr)
-        print(model.lr)
+        # print(model.lr)
 
         for i in range(batches):
 
+            # print("batch number: %d" i)
             start_index = i * batch_size
-            end_index = start_index + batch_size
+            end_index = min(start_index + batch_size, num_examples)
+
+            # print("current batch size: %d" % (end_index - start_index))
+
+            # print("Start: %d  End: %d" % (start_index, end_index))
+
             model.update_batch(images[start_index:end_index] / 255.0, labels[start_index:end_index])
             model.feed_forward()
             model.back_propogate()
 
-        # accuracies.append(get_acc(test_images / 255, np.array(test_labels), model))
-        # epoch_list.append(x)
+        accuracies.append(get_acc(test_images / 255, np.array(test_labels), model))
+        epoch_list.append(x)
         # learning_rates.append(model.lr)
 
-    # output_plots(accuracies, learning_rates, epoch_list)
+    # print("Test accuracy : ", get_acc(test_images / 255, np.array(test_labels), model))
+    results = model.predict(test_images / 255)
+    output_prediction(results)
+    print("time elapsed: {:.2f}s".format(time.time() - start_time))
+
+    output_plots(accuracies, epoch_list)
+    #learning_rates,
     # model.update_batch(images1 / 255.0, labels1)
     # model.feedforward()
     # model.backprop()
@@ -351,22 +368,48 @@ def get_acc(x, y, model):
     return acc / len(x) * 100
 
 
+def output_prediction(results):
+    with open("test_predictions.csv", 'w') as f:
+        for x in results:
+            print(x)
+            line = str(x) + '\n'
+            f.write(line)
+
+
 if __name__ == "__main__":
-    all_labels = load_train_labels()
-    all_images = load_train_images()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--train_images", type=str, help="Directory containing logs", )
+    parser.add_argument("--train_labels", type=str, help="Directory containing logs", )
+    parser.add_argument("--test_images", type=str, help="File of user subscriptions", )
+    args = parser.parse_args()
+
+    train_images_path = "./train_image.csv"
+    train_labels_path = "./train_label.csv"
+    test_images_path = "./test_image.csv"
+
+    if args.train_images is not None:
+        train_images_path = args.train_images
+
+    if args.train_labels is not None:
+        train_labels_path = args.train_images
+
+    if args.test_images is not None:
+        test_images_path = args.test_labels
+
+    all_labels = load_train_labels(train_labels_path)
+    all_images = load_train_images(train_images_path)
 
     test_labels = load_test_labels()
-    test_images = load_test_images()
+    test_images = load_test_images(test_images_path)
 
     # t_images = test_images[0:10000]
     # t_labels = test_labels[0:10000]
     #
-    # images = all_images[0:10000]
-    # labels = all_labels[0:10000]
+    images = all_images[0:101]
+    labels = all_labels[0:101]
 
-    my_model = train(all_images, np.array(all_labels), test_images, np.array(test_labels))
+    my_model = train(images, np.array(labels), test_images, np.array(test_labels))
     # print(labels[0])
     # print(images[0])
-    print("Test accuracy : ", get_acc(test_images / 255, np.array(test_labels), my_model))
-    print("time elapsed: {:.2f}s".format(time.time() - start_time))
     # print("Training accuracy : ", get_acc(all_images / 255, np.array(all_labels), my_model))
