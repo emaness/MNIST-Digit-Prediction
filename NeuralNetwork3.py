@@ -126,8 +126,8 @@ class NeuralNetwork:
         self.lr = 0.5
         input_nodes = input_I.shape[1]
         output_nodes = input_L.shape[1]
-        hidden_neurons_1 = input_nodes*2
-        hidden_neurons_2 = input_nodes*2
+        hidden_neurons_1 = int(input_nodes/4)
+        hidden_neurons_2 = int(input_nodes/8)
 
         self.weights_layer1 = np.random.randn(input_nodes, hidden_neurons_1)
         self.bias_layer1 = np.ones((1, hidden_neurons_1))
@@ -174,7 +174,8 @@ class NeuralNetwork:
     def predict(self, data):
         self.input_images = data
         self.feed_forward()
-        return self.o_layer3.argmax(axis=1)
+        # return self.o_layer3.argmax(axis=1)
+        return self.o_layer3.argmax()
 
     def update_batch(self, batch, labels):
         self.input_images = batch
@@ -262,8 +263,10 @@ def train(images, labels, test_images, test_labels):
 
     # get rid of magic numbers
     batch_size = 100
-    epochs = 10
+    epochs = 80
     num_examples = images.shape[0]
+    examples_trained = 0
+    adjustments = 0
 
     batches = int(ceil(num_examples / batch_size))
     # print("batches: %d", batches)
@@ -274,12 +277,12 @@ def train(images, labels, test_images, test_labels):
 
     model = NeuralNetwork(images[0:batch_size] / 255.0, np.array(labels[0:batch_size]))
 
-    lr_sched = LrScheduler(.5, .1)
+    lr_sched = LrScheduler(.5, .005)
 
     for x in range(epochs):
 
-        lr = lr_sched.schedule(x)
-        model.adjust_lr(lr)
+        # lr = lr_sched.schedule(x)
+        # model.adjust_lr(lr)
         # print(model.lr)
 
         for i in range(batches):
@@ -296,13 +299,21 @@ def train(images, labels, test_images, test_labels):
             model.feed_forward()
             model.back_propogate()
 
-        accuracies.append(get_acc(test_images / 255, np.array(test_labels), model))
+            examples_trained += (end_index - start_index)
+            if examples_trained >= 60000:
+                lr = lr_sched.schedule(adjustments)
+                model.adjust_lr(lr)
+                adjustments += 1
+                examples_trained = 0
+
+
+        accuracies.append(get_acc(test_images / 255.0, np.array(test_labels), model))
         epoch_list.append(x)
         # learning_rates.append(model.lr)
 
-    # print("Test accuracy : ", get_acc(test_images / 255, np.array(test_labels), model))
-    results = model.predict(test_images / 255)
-    output_prediction(results)
+    print("Test accuracy : ", get_acc(test_images / 255, np.array(test_labels), model))
+    # results = model.predict(test_images / 255)
+    # output_prediction(results)
     print("time elapsed: {:.2f}s".format(time.time() - start_time))
 
     output_plots(accuracies, epoch_list)
@@ -406,10 +417,10 @@ if __name__ == "__main__":
     # t_images = test_images[0:10000]
     # t_labels = test_labels[0:10000]
     #
-    images = all_images[0:101]
-    labels = all_labels[0:101]
+    # images = all_images[0:60000]
+    # labels = all_labels[0:60000]
 
-    my_model = train(images, np.array(labels), test_images, np.array(test_labels))
+    my_model = train(all_images, np.array(all_labels), test_images, np.array(test_labels))
     # print(labels[0])
     # print(images[0])
     # print("Training accuracy : ", get_acc(all_images / 255, np.array(all_labels), my_model))
