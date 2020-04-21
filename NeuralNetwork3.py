@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import time
 from math import ceil
 import argparse
+import sys
 
 start_time = time.time()
 
@@ -165,11 +166,11 @@ class NeuralNetwork:
         # a1_delta = z1_delta * d_ReLU(self.a1)  # w1
 
         self.weights_layer3 -= self.lr * np.dot(self.o_layer2.T, o_layer3_delta)
-        self.bias_layer3 -= self.lr * np.sum(o_layer3_delta, axis=0, keepdims=True)
+        # self.bias_layer3 -= self.lr * np.sum(o_layer3_delta, axis=0, keepdims=True)
         self.weights_layer2 -= self.lr * np.dot(self.o_layer1.T, o_layer2_delta)
-        self.bias_layer2 -= self.lr * np.sum(o_layer2_delta, axis=0)
+        # self.bias_layer2 -= self.lr * np.sum(o_layer2_delta, axis=0)
         self.weights_layer1 -= self.lr * np.dot(self.input_images.T, o_layer1_delta)
-        self.bias_layer1 -= self.lr * np.sum(o_layer1_delta, axis=0)
+        # self.bias_layer1 -= self.lr * np.sum(o_layer1_delta, axis=0)
 
     def predict(self, data):
         self.input_images = data
@@ -200,7 +201,7 @@ def output_plots(accuracies, epochs):
 
 
 def train(images, labels, test_images, test_labels):
-
+# def train(images, labels, test_images):
     # print(images.shape[0] / 100)
     # print(images.shape[1])
 
@@ -262,8 +263,8 @@ def train(images, labels, test_images, test_labels):
     #     label_sets[i] = labels[start_index:end_index]
 
     # get rid of magic numbers
-    batch_size = 100
-    epochs = 80
+    batch_size = 10
+    epochs = 50
     num_examples = images.shape[0]
     examples_trained = 0
     adjustments = 0
@@ -311,12 +312,12 @@ def train(images, labels, test_images, test_labels):
         epoch_list.append(x)
         # learning_rates.append(model.lr)
 
-    print("Test accuracy : ", get_acc(test_images / 255, np.array(test_labels), model))
-    # results = model.predict(test_images / 255)
+    print("Test accuracy : ", get_acc(test_images / 255.0, np.array(test_labels), model))
+    # results = model.predict(test_images / 255.0)
     # output_prediction(results)
     print("time elapsed: {:.2f}s".format(time.time() - start_time))
-
-    output_plots(accuracies, epoch_list)
+    #
+    # output_plots(accuracies, epoch_list)
     #learning_rates,
     # model.update_batch(images1 / 255.0, labels1)
     # model.feedforward()
@@ -389,24 +390,26 @@ def output_prediction(results):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--train_images", type=str, help="Directory containing logs", )
-    parser.add_argument("--train_labels", type=str, help="Directory containing logs", )
-    parser.add_argument("--test_images", type=str, help="File of user subscriptions", )
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--train_images", type=str, help="Directory containing logs", )
+    # parser.add_argument("--train_labels", type=str, help="Directory containing logs", )
+    # parser.add_argument("--test_images", type=str, help="File of user subscriptions", )
+    # args = parser.parse_args()
 
     train_images_path = "./train_image.csv"
     train_labels_path = "./train_label.csv"
     test_images_path = "./test_image.csv"
 
-    if args.train_images is not None:
-        train_images_path = args.train_images
+    if sys.argv[1] is not None:
+        train_images_path = sys.argv[1]
+    # if args.train_images is not None:
+    #     train_images_path = args.train_images
 
-    if args.train_labels is not None:
-        train_labels_path = args.train_images
+    if sys.argv[2] is not None:
+        train_labels_path = sys.argv[2]
 
-    if args.test_images is not None:
-        test_images_path = args.test_labels
+    if sys.argv[3] is not None:
+        test_images_path = sys.argv[3]
 
     all_labels = load_train_labels(train_labels_path)
     all_images = load_train_images(train_images_path)
@@ -420,6 +423,7 @@ if __name__ == "__main__":
     # images = all_images[0:60000]
     # labels = all_labels[0:60000]
 
+    # my_model = train(all_images, all_labels, test_images)
     my_model = train(all_images, np.array(all_labels), test_images, np.array(test_labels))
     # print(labels[0])
     # print(images[0])
