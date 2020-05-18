@@ -1,3 +1,10 @@
+"""
+Author: Everett Maness
+Date: 4/22/2020
+Written for CSCI 561 at University of Southern California
+"""
+
+
 import numpy as np
 from math import ceil
 import sys
@@ -24,7 +31,7 @@ def load_train_labels(path) -> list:
     return labels
 
 
-def sigmoid(matrix):
+def sigmoid(matrix) -> float:
     return 1 / (1 + np.exp(-matrix))
 
 
@@ -32,7 +39,7 @@ def sigmoid_derivative(matrix):
     return matrix * (1 - matrix)
 
 
-def softmax(matrix):
+def softmax(matrix) -> float:
 
     max_prob = np.max(matrix, axis=1, keepdims=True)
     numerators = np.exp(matrix - max_prob)
@@ -41,24 +48,30 @@ def softmax(matrix):
     return res
 
 
-def cross_entropy(theoretical, actual):
+"""
+Finds the error to use in calculating the corrections for back-propogation
+"""
+def cross_entropy(theoretical, actual) -> float:
 
     samples = actual.shape[0]
     res = theoretical - actual
 
-    #normalize
+    # normalize
     ans = res/samples
 
     return ans
 
-
+"""
+Abstracts a learning rate manager. Implemented as a singleton to allow for possible multi-threading
+in the future. 
+"""
 class LrScheduler:
     class __LrScheduler:
         def __init__(self, init, init_k):
             self.init_lr = init
             self.k = init_k
 
-        def schedule(self, e):
+        def schedule(self, e) -> float:
             lr = self.init_lr * np.exp(-self.k*e)
             return lr
 
@@ -71,46 +84,67 @@ class LrScheduler:
             return
 
     @staticmethod
-    def schedule(e):
+    def schedule(e) -> float:
         return LrScheduler.instance.schedule(e)
 
-
+"""
+Description: Abstracts a Neural Network. 2 hidden layers, 1/4 and 1/8 the number of neurons
+compared with input nodes, respectively.
+"""
 class NeuralNetwork:
+
+    """
+    input_I: an mxn array of input image pixel values corresponding to a set of images.
+    input_L: an mx1 array of input image labels
+    """
     def __init__(self, input_I, input_L):
 
+        layer1_scaler = 4
+        layer2_scaler = 8
+
+        # set initial learning rate (to be updated later)
         self.lr = 0.5
 
+        # set training image and label instance variables
         self.input_labels = input_L
         self.input_images = input_I
 
+        # initialize dimensions of network
         input_nodes = input_I.shape[1]
         output_nodes = input_L.shape[1]
-        hidden_neurons_1 = int(input_nodes/4)
-        hidden_neurons_2 = int(input_nodes/8)
+        hidden_neurons_1 = int(input_nodes/layer1_scaler)
+        hidden_neurons_2 = int(input_nodes/layer2_scaler)
 
         # initialize weight matrices
         self.weights_layer1 = np.random.randn(input_nodes, hidden_neurons_1)
         self.weights_layer2 = np.random.randn(hidden_neurons_1, hidden_neurons_2)
         self.weights_layer3 = np.random.randn(hidden_neurons_2, output_nodes)
 
-        #initialize biases
+        # initialize biases
         self.bias_layer1 = np.ones((1, hidden_neurons_1))
         self.bias_layer2 = np.ones((1, hidden_neurons_2))
         self.bias_layer3 = np.ones((1, output_nodes))
 
 
-
+    """
+    feed forward inputs through the layers of perceptrons 
+    """
     def feed_forward(self):
         self.o_layer1 = sigmoid(np.dot(self.input_images, self.weights_layer1) + self.bias_layer1)
         self.o_layer2 = sigmoid(np.dot(self.o_layer1, self.weights_layer2) + self.bias_layer2)
         self.o_layer3 = softmax(np.dot(self.o_layer2, self.weights_layer3) + self.bias_layer3)
 
+    """
+    execute back-propogation, update weights and biases accordingly
+    """
     def back_propagate(self):
 
+        # calculate update values
         o_layer3_del = cross_entropy(self.o_layer3, self.input_labels)
         o_layer2_del = np.dot(o_layer3_del, self.weights_layer3.T) * sigmoid_derivative(self.o_layer2)
         o_layer1_del = np.dot(o_layer2_del, self.weights_layer2.T) * sigmoid_derivative(self.o_layer1)
 
+        # update weights and biases
         self.update_weights(o_layer1_del, o_layer2_del, o_layer3_del)
         self.update_biases(o_layer1_del, o_layer2_del, o_layer3_del)
 
@@ -126,7 +160,7 @@ class NeuralNetwork:
         self.bias_layer2 = self.bias_layer2 - (self.lr * np.sum(o_layer2_del, axis=0))
         self.bias_layer1 = self.bias_layer1 - (self.lr * np.sum(o_layer1_del, axis=0))
 
-    def predict(self, data):
+    def predict(self, data) -> list:
         self.input_images = data
         self.feed_forward()
         return self.o_layer3.argmax(axis=1)
@@ -143,7 +177,10 @@ def train(images, labels, test_images):
 
     batch_size = 10
     epochs = 30
+
+    # number of images in training set
     num_examples = images.shape[0]
+
     examples_trained = 0
     adjustments = 0
 
@@ -151,6 +188,7 @@ def train(images, labels, test_images):
 
     model = NeuralNetwork(images[0:batch_size] / 255.0, labels[0:batch_size])
 
+    #instantiate learning rate scheduler
     lr_sched = LrScheduler(.5, .005)
 
     for x in range(epochs):
