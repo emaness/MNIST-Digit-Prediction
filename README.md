@@ -46,5 +46,5 @@ Run the following:
 
     python3 NeuralNetwork3.py [training images path] [training labels path] [test images path]
     
-For a training set of 60,000 or fewer, the program should take under ten mintues
+For a training set of 60,000 or fewer, the program should take under ten mintues.
 
